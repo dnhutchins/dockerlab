@@ -1,0 +1,19 @@
+<%include file="head.html"/>	
+
+                        <div id="main" style="width: 770px">
+
+                                <a name="BaseImages"></a>
+                                <h1>Login</h1>
+                                <div class="container" style="text-align: center">
+                                                 <form method="post" action="/auth/login">
+                                                    <input type="hidden" name="from_page" value="${from_page}" />
+                                                    ${msg}<br />
+                                                    Username: <input type="text" name="username" /><br />
+                                                    Password: <input type="password" name="password" style="margin-top: 5px; margin-left: 5px; margin-bottom: 5px;" /><br />
+                                                    <input type="submit" value="Log in" />
+                                                 </form>
+                                </div>
+                        </div>
+
+
+<%include file="foot.html"/>

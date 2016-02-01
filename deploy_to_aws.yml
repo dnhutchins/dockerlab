@@ -1,0 +1,106 @@
+---
+- name: Launch services
+  hosts: localhost
+  connection: local
+  gather_facts: False
+  tasks:
+  - name:
+    ec2:
+      key_name: "{{ lookup('env','INIT_KEY') }}"
+      instance_type: "{{ lookup('env','INSTANCE_TYPE') }}"
+      image: ami-5189a661
+      wait: yes
+      wait_timeout: 3000
+      instance_tags:
+         Name: dockerlab-app
+      count_tag: 
+         Name: dockerlab-app
+      exact_count: 1
+      vpc_subnet_id: "{{ lookup('env','SUBNET') }}"
+      assign_public_ip: yes
+      group: Home_Network
+    register: ec2
+  - ec2_vol:
+      instance: "{{ item.id }}"
+      volume_size: 10
+      volume_type: standard
+      device_name: /dev/xvdf
+    with_items: ec2.instances
+    register: ec2_vol
+  - name: Add instance to host group
+    add_host: hostname={{ item.public_ip }} groupname=dockerlab_inst
+    with_items: ec2.instances
+  - name: Wait for SSH to come up
+    wait_for: host={{ item.public_dns_name }} port=22 delay=60 timeout=320 state=started
+    with_items: ec2.instances
+  - name: Add DNS record
+    route53:
+      command: "create"
+      zone: "{{ lookup('env','DOMAIN_NAME') }}"
+      record: "{{ lookup('env','HOST_NAME') }}"
+      type: "A"
+      ttl: "300"
+      value: "{{item.public_ip}}"
+      overwrite: True
+    with_items: ec2.instances
+- name: Configure instance
+  hosts: dockerlab_inst
+  remote_user: ubuntu
+  sudo: True
+  gather_facts: True
+  pre_tasks:
+    - name: Create filesystem on EC2 volume
+      filesystem: fstype=ext4 dev=/dev/xvdf
+    - name: Mount EC2 volume as /var/lib/docker
+      mount: name=/var/lib/docker src=/dev/xvdf fstype=ext4 state=mounted
+  roles:
+    - role: angstwad.docker_ubuntu
+    - role: jdauphant.ssl-certs
+      ssl_certs_local_privkey_path: 'private/ssl/ssl.key'
+      ssl_certs_local_cert_path: 'private/ssl/ssl.crt'
+    - role: jdauphant.nginx
+      nginx_sites:
+        redirect:
+          - listen 80
+          - rewrite ^(.*) https://$host$1 permanent
+        default:
+          - listen 443 ssl
+          - server_name _
+          - location / { proxy_pass http://dockerlab; }
+          - client_max_body_size 1024M
+      nginx_configs:
+        proxy:
+          - proxy_set_header Host $host
+          - proxy_set_header X-Real-IP $remote_addr
+          - proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for
+          - proxy_set_header X-Forwarded-Proto $scheme
+          - proxy_read_timeout 90
+        upstream:
+          - upstream dockerlab { server 127.0.0.1:8080 weight=10; }
+        ssl:
+          - ssl_certificate_key {{ssl_certs_privkey_path}}
+          - ssl_certificate     {{ssl_certs_cert_path}}
+  tasks:
+    - name: Install Cherrypy v3
+      apt: pkg=python-cherrypy3 state=installed
+    - name: Install Mako
+      apt: pkg=python-mako state=installed
+    - name: Create application directory
+      file: path=/opt/dockerlab state=directory
+    - name: Copy application package
+      unarchive: src=dl.tgz dest=/opt/dockerlab 
+    - name: Generate Nginx configuration
+      shell: /opt/dockerlab/genconf.sh > /etc/nginx/sites-enabled/default.conf
+    - name: Restart Nginx
+      shell: service nginx restart 
+    - name: Install DockerLab init script
+      copy: src=dockerlab.conf dest=/etc/init/dockerlab.conf
+    - name: start DockerLab service
+      shell: service dockerlab start
+    - name: Copy base image to instance
+      copy: src=Dockerlab.base.image dest=/var/lib/docker/Dockerlab.base.image
+    - name: Load base image into repository
+      shell: "cat /var/lib/docker/Dockerlab.base.image | docker load"
+    - name: Remove base image file
+      file: path=/var/lib/docker/Dockerlab.base.image state=absent
+

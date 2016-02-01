@@ -1,0 +1,56 @@
+---
+- name: Launch services
+  hosts: localhost
+  connection: local
+  sudo: True
+  gather_facts: True
+  roles:
+    - role: angstwad.docker_ubuntu
+    - role: jdauphant.ssl-certs
+      ssl_certs_local_privkey_path: 'private/ssl/ssl.key'
+      ssl_certs_local_cert_path: 'private/ssl/ssl.crt'
+    - role: jdauphant.nginx
+      nginx_sites:
+        redirect:
+          - listen 80
+          - rewrite ^(.*) https://$host$1 permanent
+        default:
+          - listen 443 ssl
+          - location / { proxy_pass http://dockerlab; }
+          - client_max_body_size 1024M
+      nginx_configs:
+        proxy:
+          - proxy_set_header Host $host
+          - proxy_set_header X-Real-IP $remote_addr
+          - proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for
+          - proxy_set_header X-Forwarded-Proto $scheme
+          - proxy_read_timeout 90
+        upstream:
+          - upstream dockerlab { server 127.0.0.1:8080 weight=10; }
+        ssl:
+          - ssl_certificate_key {{ssl_certs_privkey_path}}
+          - ssl_certificate     {{ssl_certs_cert_path}}
+  tasks:
+    - name: Install Cherrypy v3
+      apt: pkg=python-cherrypy3 state=installed
+    - name: Install Mako
+      apt: pkg=python-mako state=installed
+    - name: Create application directory
+      file: path=/opt/dockerlab state=directory
+    - name: Copy application package
+      unarchive: src=dl.tgz dest=/opt/dockerlab 
+    - name: Generate Nginx configuration
+      shell: /opt/dockerlab/genconf.sh > /etc/nginx/sites-enabled/default.conf
+    - name: Restart Nginx
+      service: name=nginx state=restarted 
+    - name: Install DockerLab init script
+      copy: src=dockerlab.conf dest=/etc/init/dockerlab.conf
+    - name: start DockerLab service
+      service: name=dockerlab state=started
+    - name: Copy base image to instance
+      copy: src=Dockerlab.base.image dest=/var/lib/docker/Dockerlab.base.image
+    - name: Load base image into repository
+      shell: "cat /var/lib/docker/Dockerlab.base.image | docker load"
+    - name: Remove base image file
+      file: path=/var/lib/docker/Dockerlab.base.image state=absent
+

@@ -1,0 +1,124 @@
+<%include file="head.html"/>	
+<style>
+
+.delete {
+    background: url(/static/images/icons.png) -368px 0px; 
+    width: 23px; 
+    height: 23px; 
+    border: 0; 
+    margin:0; 
+    padding: 0
+}
+.download {
+    background: url(/static/images/icons.png) -205px -70px; 
+    width: 23px; 
+    height: 23px; 
+    border: 0; 
+    margin:0; 
+    padding: 0
+}
+.commit {
+    background: url(/static/images/icons.png) -229px -206px; 
+    width: 23px; 
+    height: 23px; 
+    border: 0; 
+    margin:0; 
+    padding: 0
+}
+.edit {
+    background: url(/static/images/icons.png) -390px -184px; 
+    width: 23px; 
+    height: 23px; 
+    border: 0; 
+    margin:0; 
+    padding: 0
+}
+.launch {
+    background: url(/static/images/icons.png) -278px -115px;
+    width: 23px;
+    height: 23px;
+    border: 0;
+    margin:0;
+    padding: 0
+}
+
+.delete:hover {
+    background: url(/static/images/icons1.png) -368px 0px;
+}
+.download:hover {
+    background: url(/static/images/icons1.png) -205px -70px;
+}
+.commit:hover {
+    background: url(/static/images/icons1.png) -229px -206px;
+}
+.edit:hover {
+    background: url(/static/images/icons1.png) -390px -184px;
+}
+.launch:hover {
+    background: url(/static/images/icons1.png) -278px -115px;
+}
+
+
+
+</style>
+                        <div id="main">
+
+                                <a name="BaseImages"></a>
+                                <h1>System Base Images</h1>
+                                 <ul>
+                                 % for entry in baseimages:
+                                 <li><code><div style="width: auto; background-color: #4A6730; color: #fff; padding-left: 5px;padding-bottom: 4px"><a style="color: #fff;" href="/launch/${entry['RepoTag']}"><b>${entry['Name']}</b></a><div style="float:right"><a href="/delete/${entry['RepoTag']}"><img class="delete" src="/static/images/trans.png" title="Delete image from system."></a><a href="/launch/${entry['RepoTag']}"><img class="launch" src="/static/images/trans.png" title="Launch a new container with this image."></a></div></div><div style="padding-left: 15px; color: #000;"><b> Repository Name: </b>${entry['RepoTag']}<br><b>Description: </b>${entry['Desc']}</div></code></li>
+                                 % endfor
+                                 </ul>
+                                <a name="UserImages"></a>
+                                <h1>Saved User Images</h1>
+                                <ul>
+                                 % for entry in userimages: 
+                             <li>
+                                     <code>
+                                         <div style="width: auto; background-color: #4A6730; color: #fff; padding-left: 5px;padding-bottom: 4px">
+                                             <a href="/launch/${entry['RepoTag']}" style="color: #fff;">
+                                             <b>${entry['Name']}</b>
+                                             </a>
+                                             <div style="float:right"><a href="/promote/${entry['RepoTag']}"><img class="commit" src="/static/images/trans.png" title="Commit image to Base Images."></a><a href="/delete/${entry['RepoTag']}"><img class="delete" src="/static/images/trans.png" title="Delete image from system."></a><a href="/launch/${entry['RepoTag']}"><img class="launch" src="/static/images/trans.png" title="Launch a new container with this image."></a></div>
+                                         </div>
+                                         <div style="padding-left: 15px; color: #000;">
+                                             <b>Repository Name: </b>${entry['RepoTag']}<br>
+                                             <b>Description: </b>${entry['Desc']}
+                                         </div>
+                                     </code>
+                                 </a>
+                             </li>
+                                 % endfor
+                                 </ul>
+                                <a name="RunningImages"></a>
+                                <h1>Currently Running Sessions</h1>
+                                <ul>
+                                 % for entry in runningimages:
+                                     <li><code><div style="width: auto; background-color: #4A6730; color: #fff; padding-left: 5px;padding-bottom: 4px"><a style="color: #fff;" href="/static/noVNC/vnc.html?path=/${entry['Port']}/websockify&resize=scale&password=password"><b>${entry['Name']}</b></a><div style="float:right"><a href="/downloadhome/${entry['Port']}"><img class="download" src="/static/images/trans.png" title="Download user working directory."></a><a href="/saveinst/${entry['Port']}"><img class="commit" src="/static/images/trans.png" title="Save changes to a user image."></a><a href="/destroy/${entry['Port']}"><img class="delete" src="/static/images/trans.png" title="End this session."></a><a href="/static/noVNC/vnc.html?path=/${entry['Port']}/websockify&resize=scale&password=password"><img class="launch" src="/static/images/trans.png" title="Reconnect to this session."></a></div></div><div style="padding-left: 15px; color: #000"><b> Source Repository Name: </b>${entry['Image']}<br><b>Running Since: </b>${entry['Start']}</div></code></a></li>
+                                 % endfor
+                                 </ul>
+                        </div>
+
+                        <div id="sidebar">
+                                <h1>Account</h1>
+                                <ul class="sidemenu">
+                                        <li><a href="/auth/logout">Logout</a></li>
+                                        <li><a href="#profile">Profile: ( ${username} )</a></li>
+                                </ul>
+                                <h1>Main Menu</h1>
+                                <ul class="sidemenu">
+                                        <li><a href="/">Home</a></li>
+                                        <li><a href="#Help">Help</a></li>
+                                        <li><a href="#DLDL">Download DockerLab</a></li>
+                    </ul>
+
+                                <h1>System Statistics</h1>
+                                <ul class="sidemenu">
+                    <li><a href="#status"> Running Sessions: ${runningcount}<br>
+                    Saved Images: ${savedcount}</a></li>
+                                </ul>
+
+                        </div>
+
+<%include file="foot.html"/>

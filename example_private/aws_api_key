@@ -1,0 +1,2 @@
+export AWS_ACCESS_KEY_ID='<Your API key ID here>'
+export AWS_SECRET_ACCESS_KEY='<Your API key here>'
