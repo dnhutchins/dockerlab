@@ -1,5 +1,7 @@
 # dockerlab
 
+DockerLab is a play on Virtualized Desktop Infrastructure (VDI) using docker containers. The goal of DockerLab is to provide a lightweight environment where workload specific desktop images can be created, modified, and shared between a working group of users.
+
 ## Common prerequisites
 
 1. git clone https://github.com/dnhutchins/dockerlab.git
