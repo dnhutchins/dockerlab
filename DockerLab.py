@@ -50,7 +50,6 @@ class DockerLab(object):
         username = cherrypy.session.get(SESSION_KEY)
         runningcount = 0
         savedcount = 0
-
         # Running containers are identified by their public port that
         # correlates to their private port 6801. This is enforced as
         # unique by consequence of socket binding. The public port
@@ -74,12 +73,14 @@ class DockerLab(object):
         # Base images will be identified with "dockerlab" as the
         # repository name.
 
-        baseimages = getimagesbyrepo('dockerlab')
+        baseimages = self.getimagesbyrepo('dockerlab')
+        savedcount += len(baseimages)
 
         # User owned images will be identified with "userimages_<username>"
         # at the repository name.
 
-        userimages = getimagesbyrepo('userimages_' + username)
+        userimages = self.getimagesbyrepo('userimages_' + username)
+        savedcount += len(userimages)
 
         tmpl = lookup.get_template("index.html")
         return tmpl.render(baseimages=baseimages,
@@ -260,6 +261,27 @@ class DockerLab(object):
         cherrypy.response.headers['Content-Disposition'] = filename
         return hometar
 
+    # Used to get images using repository name
+    # Base image metadata is stored in the comment
+    # field of the image in JSON.  If the metadata is absent
+    # defaults are assumed for display.
+    
+    def getimagesbyrepo(self, repository):
+        storedImages = []
+        images = cli.images(repository)
+        for img in images:
+            try:
+                info = json.loads(cli.inspect_image(img['Id'])['Comment'])
+            except Exception as e:
+                info = json.loads('{"Name": "Unnamed Image",' +
+                                  '"Desc": "Undescribed Image"}')
+            imagedef = {}
+            imagedef['RepoTag'] = img['RepoTags'][0]
+            imagedef['Name'] = info['Name']
+            imagedef['Desc'] = info['Desc']
+            storedImages.append(imagedef)
+        return storedImages
+
 
 # Used to confirm the availability of a local port
 
@@ -285,28 +307,6 @@ def getcontainerbyport(pubport):
                     return img
 
 
-# Used to get images using repository name
-# Base image metadata is stored in the comment
-# field of the image in JSON.  If the metadata is absent
-# defaults are assumed for display.
-
-def getimagesbyrepo(repository):
-    images = []
-    images = cli.images(repository)
-    for img in images:
-        rinfo = cli.inspect_image(img['Id'])['Comment']
-        try:
-            info = json.loads(cli.inspect_image(img['Id'])['Comment'])
-        except Exception as e:
-            info = json.loads('{"Name": "Unnamed Image",' +
-                              '"Desc": "Undescribed Image"}')
-        savedcount += 1
-        imagedef = {}
-        imagedef['RepoTag'] = img['RepoTags'][0]
-        imagedef['Name'] = info['Name']
-        imagedef['Desc'] = info['Desc']
-        images.append(imagedef)
-    return images
 
 
 cherrypy.quickstart(DockerLab())
