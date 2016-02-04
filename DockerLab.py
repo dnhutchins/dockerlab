@@ -72,46 +72,14 @@ class DockerLab(object):
             runningimages.append(active_container)
 
         # Base images will be identified with "dockerlab" as the
-        # repository name. Base image metadata is stored in the comment
-        # field of the image in JSON.  If the metadata is absent
-        # defaults are assumed for display.
+        # repository name.
 
-        baseimages = []
-        images = cli.images("dockerlab")
-        for img in images:
-            rinfo = cli.inspect_image(img['Id'])['Comment']
-            try:
-                info = json.loads(cli.inspect_image(img['Id'])['Comment'])
-            except Exception as e:
-                info = json.loads('{"Name": "Unnamed Image",' +
-                                  '"Desc": "Undescribed Image"}')
-            savedcount += 1
-            imagedef = {}
-            imagedef['RepoTag'] = img['RepoTags'][0]
-            imagedef['Name'] = info['Name']
-            imagedef['Desc'] = info['Desc']
-            baseimages.append(imagedef)
+        baseimages = getimagesbyrepo('dockerlab')
 
         # User owned images will be identified with "userimages_<username>"
-        # at the repository name. Metadata is stored in the comment field
-        # of the image in JSON. If the metadata is absent defaults are assumed
-        # for display.
+        # at the repository name.
 
-        userimages = []
-        images = cli.images("userimages_" + username)
-        for img in images:
-            imagedef = {}
-            rinfo = cli.inspect_image(img['Id'])['Comment']
-            try:
-                info = json.loads(cli.inspect_image(img['Id'])['Comment'])
-            except Exception as e:
-                info = json.loads('{"Name": "Unnamed Image",' +
-                                  '"Desc": "Undescribed Image"}')
-            imagedef['RepoTag'] = img['RepoTags'][0]
-            imagedef['Name'] = info['Name']
-            imagedef['Desc'] = info['Desc']
-            savedcount += 1
-            userimages.append(imagedef)
+        userimages = getimagesbyrepo('userimages_' + username)
 
         tmpl = lookup.get_template("index.html")
         return tmpl.render(baseimages=baseimages,
@@ -137,7 +105,7 @@ class DockerLab(object):
         container = cli.create_container(image=container,
                                          ports=[6081],
                                          host_config=cli.create_host_config(
-                                          port_bindings={6081: port}))
+                                             port_bindings={6081: port}))
         response = cli.start(container=container.get('Id'))
         port += 1
         tmpl = lookup.get_template("connect.html")
@@ -177,7 +145,7 @@ class DockerLab(object):
         container = cli.create_container(image=cid['Image'],
                                          ports=[6081],
                                          host_config=cli.create_host_config(
-                                          port_bindings={6081: pubport}))
+                                             port_bindings={6081: pubport}))
         cli.start(container=container.get('Id'))
         tmpl = lookup.get_template("connect.html")
         return tmpl.render(wait='10',
@@ -255,7 +223,7 @@ class DockerLab(object):
         tmpl = lookup.get_template("promote.html")
         return tmpl.render(repo=sourcename,
                            reponame=sourcename.split(
-                            ':')[1].split("-")[1],
+                               ':')[1].split("-")[1],
                            name=info['Name'],
                            desc=info['Desc'])
 
@@ -315,6 +283,30 @@ def getcontainerbyport(pubport):
             if prt['PrivatePort'] == 6081:
                 if (int(prt['PublicPort']) == int(pubport)):
                     return img
+
+
+# Used to get images using repository name
+# Base image metadata is stored in the comment
+# field of the image in JSON.  If the metadata is absent
+# defaults are assumed for display.
+
+def getimagesbyrepo(repository):
+    images = []
+    images = cli.images(repository)
+    for img in images:
+        rinfo = cli.inspect_image(img['Id'])['Comment']
+        try:
+            info = json.loads(cli.inspect_image(img['Id'])['Comment'])
+        except Exception as e:
+            info = json.loads('{"Name": "Unnamed Image",' +
+                              '"Desc": "Undescribed Image"}')
+        savedcount += 1
+        imagedef = {}
+        imagedef['RepoTag'] = img['RepoTags'][0]
+        imagedef['Name'] = info['Name']
+        imagedef['Desc'] = info['Desc']
+        images.append(imagedef)
+    return images
 
 
 cherrypy.quickstart(DockerLab())
