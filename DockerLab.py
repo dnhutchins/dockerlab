@@ -265,7 +265,7 @@ class DockerLab(object):
     # Base image metadata is stored in the comment
     # field of the image in JSON.  If the metadata is absent
     # defaults are assumed for display.
-    
+
     def getimagesbyrepo(self, repository):
         storedImages = []
         images = cli.images(repository)
@@ -305,8 +305,6 @@ def getcontainerbyport(pubport):
             if prt['PrivatePort'] == 6081:
                 if (int(prt['PublicPort']) == int(pubport)):
                     return img
-
-
 
 
 cherrypy.quickstart(DockerLab())
