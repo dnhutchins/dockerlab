@@ -15,9 +15,9 @@ DockerLab is a play on Virtualized Desktop Infrastructure (VDI) using docker con
 
 ## Deploy to AWS with ansible playbook
 
-1. Copy the "example_private/" directory to "example/"
-2. Replace the files in "example/" with your AWS API key and EC2 private key
-3. Replace the files in "example/ssl" with your SSL certificate and private key
-4. Edit "deploy_to_aws.sh" to include your EC2 keypair name, domain name (Route53 zone), and hostname 
+1. Copy the "example_private/" directory to "private/"
+2. Edit private/aws_api_key with your AWS API key
+3. Edit private/aws_target_config with the values for your target instance
+4. Replace the files in "private/ssl" with your SSL certificate and private key
 5. Execute ./deploy_to_aws.sh
 

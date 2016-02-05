@@ -1,0 +1,7 @@
+export EC2_REGION='<region>' # eg: us-west-2
+export SUBNET='<subnet id>' # eg: subnet-f4a12aad
+export INSTANCE_TYPE='<instance type>' # eg: t2.micro
+export INIT_KEY='<the name of your API key>'
+export DOMAIN_NAME="example.com" # Your Route53 ZONE
+export HOST_NAME="dockerlab.example.com" # The FQDN to be added/updated in Route53
+
