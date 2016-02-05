@@ -33,12 +33,22 @@ def mimetype(type):
         return wrapper
     return decorate
 
+def handle_error():
+    tmpl = lookup.get_template("error.html")
+    cherrypy.response.status = 500
+    cherrypy.response.body = [
+        tmpl.render()
+    ]
 
 class DockerLab(object):
 
     _cp_config = {
         'tools.sessions.on': True,
-        'tools.auth.on': True
+        'tools.auth.on': True,
+        'tools.proxy.on': True,
+        'tools.proxy.local': 'X-Forwarded-Host',
+        'tools.proxy.local': 'Host',
+        'request.error_response': handle_error
     }
 
     auth = AuthController()
