@@ -46,7 +46,8 @@
 - name: Configure instance
   hosts: dockerlab_inst
   remote_user: ubuntu
-  sudo: True
+  become: True
+  become_method: sudo
   gather_facts: True
   pre_tasks:
     - name: Create filesystem on EC2 volume
@@ -92,11 +93,11 @@
     - name: Generate Nginx configuration
       shell: /opt/dockerlab/genconf.sh > /etc/nginx/sites-enabled/default.conf
     - name: Restart Nginx
-      shell: service nginx restart 
+      service: name=nginx state=restarted 
     - name: Install DockerLab init script
       copy: src=dockerlab.conf dest=/etc/init/dockerlab.conf
     - name: start DockerLab service
-      shell: service dockerlab start
+      service: name=dockerlab state=started
     - name: Copy base image to instance
       copy: src=Dockerlab.base.image dest=/var/lib/docker/Dockerlab.base.image
     - name: Load base image into repository

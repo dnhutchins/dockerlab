@@ -2,7 +2,8 @@
 - name: Launch services
   hosts: localhost
   connection: local
-  sudo: True
+  become: True
+  become_method: sudo
   gather_facts: True
   roles:
     - role: angstwad.docker_ubuntu
