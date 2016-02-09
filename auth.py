@@ -2,26 +2,14 @@ import cherrypy
 
 from mako.template import Template
 from mako.lookup import TemplateLookup
+from docker import Client
+import json
+import base64
+import hashlib
 
 lookup = TemplateLookup(directories=['templates'])
 SESSION_KEY = '_cp_username'
-
-
-def check_credentials(username, password):
-    """Verifies credentials for username and password.
-    Returns None on success or a string describing the error on failure"""
-    # Adapt to your needs
-    if username in ('joe', 'steve') and password == 'secret':
-        return None
-    else:
-        return u"Incorrect username or password."
-
-    # An example implementation which uses an ORM could be:
-    # u = User.get(username)
-    # if u is None:
-    #     return u"Username %s is unknown to me." % username
-    # if u.password != md5.new(password).hexdigest():
-    #     return u"Incorrect password"
+cli = Client(base_url='unix://var/run/docker.sock')
 
 
 def check_auth(*args, **kwargs):
@@ -102,6 +90,73 @@ def all_of(*conditions):
 # Controller to provide login and logout actions
 
 class AuthController(object):
+
+    authDB = []
+
+    def __init__(self):
+        self.authDB = self.getdatabase()
+
+    # This will load the existing database from the null
+    # image dockerlabconfig:auth If the image doesn't exist
+    # a new image is created, started, and then committed
+    # with a the default admin account
+
+    def getdatabase(self):
+        try:
+            container = cli.images('dockerlabconfig:auth')
+            info = json.loads(cli.inspect_image(container[0]['Id'])['Comment'])
+        except Exception as e:
+            nullimageenc = 'H4sIADODtVYAA+3PMQ6CQBAF0D3K3kB2V5bzmGhHIEHw' \
+                           '/BLUxkIrbHyv+ZPMFH/Ol9thWPo+7KhZ1Vq3XL3nNqdc' \
+                           '2zanklIXmpSPXQmx7FnqZbnOpynGMI3j/Onu2/7xR3rm' \
+                           'T6oDAAAAAAAAAADwv+7c8q/OACgAAA=='
+            nullimage = base64.b64decode(nullimageenc)
+            cli.import_image_from_data(nullimage, 'dockerlabconfig', 'auth')
+            newcontainer = cli.create_container('dockerlabconfig:auth',
+                                                '/dev/null')
+            passhasher = hashlib.sha256()
+            passhasher.update("notsecret")
+            passhash = passhasher.hexdigest()
+            dbinit = {}
+            dbinit['admin'] = {}
+            dbinit['admin']['password'] = passhash
+            dbinit['admin']['security'] = 'admin'
+            dbinit['admin']['comment'] = 'Default ADMIN account'
+            dbinit['user'] = {}
+            dbinit['user']['passowrd'] = passhash
+            dbinit['user']['security'] = 'user'
+            dbinit['user']['comment'] = 'Default USER account'
+            cli.commit(newcontainer['Id'],
+                       'dockerlabconfig',
+                       'auth',
+                       json.dumps(dbinit))
+            cli.remove_container(newcontainer['Id'])
+            container = cli.images('dockerlabconfig:auth')
+            info = json.loads(cli.inspect_image(container[0]['Id'])['Comment'])
+        return info
+
+    def check_credentials(self, username, password):
+        """Verifies credentials for username and password.
+        Returns None on success or a string describing the error on failure"""
+        # Adapt to your needs
+        if username in self.authDB.keys():
+            passhasher = hashlib.sha256()
+            passhasher.update(password)
+            passhash = passhasher.hexdigest()
+            if passhash == self.authDB[username]['password']:
+                return None
+            else:
+                return u"Incorrect username or password"
+        else:
+            return u"Incorrect username or password."
+
+        # An example implementation which uses an ORM could be:
+        # u = User.get(username)
+        # if u is None:
+        #     return u"Username %s is unknown to me." % username
+        # if u.password != md5.new(password).hexdigest():
+        #     return u"Incorrect password"
+
     def on_login(self, username):
         """Called on successful login"""
 
@@ -135,7 +190,7 @@ class AuthController(object):
         if username is None or password is None:
             return self.get_loginform("", from_page=from_page)
 
-        error_msg = check_credentials(username, password)
+        error_msg = self.check_credentials(username, password)
         if error_msg:
             return self.get_loginform(username, error_msg, from_page)
         else:

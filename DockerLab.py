@@ -33,12 +33,14 @@ def mimetype(type):
         return wrapper
     return decorate
 
+
 def handle_error():
     tmpl = lookup.get_template("error.html")
     cherrypy.response.status = 500
     cherrypy.response.body = [
         tmpl.render()
     ]
+
 
 class DockerLab(object):
 
