@@ -15,7 +15,7 @@ import json
 from docker import Client
 from mako.template import Template
 from mako.lookup import TemplateLookup
-from auth import AuthController, require, member_of, name_is
+from controller.auth import AuthController, require, member_of, name_is
 
 SESSION_KEY = '_cp_username'
 lookup = TemplateLookup(directories=['view'])
