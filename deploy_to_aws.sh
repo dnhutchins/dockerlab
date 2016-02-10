@@ -8,7 +8,7 @@ export ANSIBLE_HOST_KEY_CHECKING=False
 eval `ssh-agent -s`
 ssh-add private/init_key.pem
 
-tar zcvf dl.tgz auth.py DockerLab.py genconf.sh static templates
+tar zcvf dl.tgz auth.py DockerLab.py genconf.sh static view
 
 ansible-playbook ./deploy_to_aws.yml
 

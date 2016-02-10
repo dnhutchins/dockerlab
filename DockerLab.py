@@ -18,7 +18,7 @@ from mako.lookup import TemplateLookup
 from auth import AuthController, require, member_of, name_is
 
 SESSION_KEY = '_cp_username'
-lookup = TemplateLookup(directories=['templates'])
+lookup = TemplateLookup(directories=['view'])
 cli = Client(base_url='unix://var/run/docker.sock')
 port = 6000
 

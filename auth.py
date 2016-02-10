@@ -7,7 +7,7 @@ import json
 import base64
 import hashlib
 
-lookup = TemplateLookup(directories=['templates'])
+lookup = TemplateLookup(directories=['view'])
 SESSION_KEY = '_cp_username'
 cli = Client(base_url='unix://var/run/docker.sock')
 
