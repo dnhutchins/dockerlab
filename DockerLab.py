@@ -68,13 +68,15 @@ class DockerLab(object):
         savedcount = len(baseimages)
         userimages = self.docker.getuserimages(username)
         savedcount += len(userimages)
+        admin = self.auth.isadmin(username)
         tmpl = lookup.get_template("index.html")
         return tmpl.render(baseimages=baseimages,
                            userimages=userimages,
                            runningimages=runningimages,
                            runningcount=runningcount,
                            savedcount=savedcount,
-                           username=username)
+                           username=username,
+                           admin=admin)
 
     # Launch a new container
     #
@@ -200,6 +202,23 @@ class DockerLab(object):
         hometar = self.docker.getcontainerhome(pubport)
         cherrypy.response.headers['Content-Disposition'] = hometar['filename']
         return hometar['data']
+
+    @cherrypy.expose
+    @require(member_of('admin'))
+    def adduser(self):
+        tmpl = lookup.get_template("adduser.html")
+        return tmpl.render()
+
+    @cherrypy.expose
+    @require(member_of('admin'))
+    def commituser(self, username, password, comment, admin = ''):
+        adminflag = False
+        if admin == "true":
+            adminflag = True
+        self.auth.adduser(username, password, comment, adminflag)
+        tmpl = lookup.get_template("redirect.html")
+        return tmpl.render(url='/', wait='4', action='Creating User')
+
 
 
 cherrypy.quickstart(DockerLab())

@@ -109,11 +109,23 @@ class AuthController(object):
         # if u.password != md5.new(password).hexdigest():
         #     return u"Incorrect password"
 
+    def adduser(self, username, password, comment, admin):
+        group = "user"
+        if admin:
+           group = "admin"
+        return users.adduser(username, password, group, comment)
+
     def on_login(self, username):
         """Called on successful login"""
 
     def on_logout(self, username):
         """Called on logout"""
+
+    def isadmin(self, username):
+        if users.getuser(username)['group'] == 'admin':
+            return True
+        else:
+            return False
 
     def get_loginform(self,
                       username,

@@ -106,6 +106,12 @@
                                         <li><a href="/auth/logout">Logout</a></li>
                                         <li><a href="#profile">Profile: ( ${username} )</a></li>
                                 </ul>
+                                % if admin:
+                                <h1>Admin Tools</h1>
+                                <ul class="sidemenu">
+                                        <li><a href="/adduser">Add A User</a></li>
+                                </ul>
+                                % endif
                                 <h1>Main Menu</h1>
                                 <ul class="sidemenu">
                                         <li><a href="/">Home</a></li>
