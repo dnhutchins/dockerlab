@@ -15,7 +15,8 @@ import json
 from docker import Client
 from mako.template import Template
 from mako.lookup import TemplateLookup
-from controller.auth import AuthController, require, member_of, name_is
+from controller.AuthController import AuthController, require, member_of, name_is
+from controller.DockerController import DockerController
 
 SESSION_KEY = '_cp_username'
 lookup = TemplateLookup(directories=['view'])
@@ -54,46 +55,19 @@ class DockerLab(object):
     }
 
     auth = AuthController()
+    docker = DockerController()
 
     @cherrypy.expose
     @require()
     def index(self):
         sess = cherrypy.session
         username = cherrypy.session.get(SESSION_KEY)
-        runningcount = 0
-        savedcount = 0
-        # Running containers are identified by their public port that
-        # correlates to their private port 6801. This is enforced as
-        # unique by consequence of socket binding. The public port
-        # number is also used in the path for the websocket as defined
-        # in the nginx configuration.
-
-        containers = cli.containers()
-        runningimages = []
-        for img in containers:
-            active_container = {}
-            runningcount += 1
-            rinfo = cli.inspect_container(img['Id'])
-            active_container['Image'] = img['Image']
-            active_container['Name'] = img['Names'][0].replace('/', '')
-            active_container['Start'] = rinfo['State']['StartedAt']
-            for prt in img['Ports']:
-                if prt['PrivatePort'] == 6081:
-                    active_container['Port'] = prt['PublicPort']
-            runningimages.append(active_container)
-
-        # Base images will be identified with "dockerlab" as the
-        # repository name.
-
-        baseimages = self.getimagesbyrepo('dockerlab')
-        savedcount += len(baseimages)
-
-        # User owned images will be identified with "userimages_<username>"
-        # at the repository name.
-
-        userimages = self.getimagesbyrepo('userimages_' + username)
+        runningimages = self.docker.getrunningcontainers(username)
+        runningcount = len(runningimages)
+        baseimages = self.docker.getbaseimages()
+        savedcount = len(baseimages)
+        userimages = self.docker.getuserimages(username)
         savedcount += len(userimages)
-
         tmpl = lookup.get_template("index.html")
         return tmpl.render(baseimages=baseimages,
                            userimages=userimages,
@@ -112,19 +86,11 @@ class DockerLab(object):
     @cherrypy.expose
     @require()
     def launch(self, container):
-        global port
-        while testport(port):
-            port += 1
-        container = cli.create_container(image=container,
-                                         ports=[6081],
-                                         host_config=cli.create_host_config(
-                                             port_bindings={6081: port}))
-        response = cli.start(container=container.get('Id'))
-        port += 1
+        port = self.docker.launchcontainer(container)
         tmpl = lookup.get_template("connect.html")
         return tmpl.render(wait='4',
                            action='Loading Session.......',
-                           port=str(port-1),
+                           port=str(port),
                            password='password')
 
     # Delete a container
@@ -132,7 +98,7 @@ class DockerLab(object):
     @cherrypy.expose
     @require()
     def delete(self, container):
-        cli.remove_image(container)
+        self.docker.deletecontainer(container)
         tmpl = lookup.get_template("redirect.html")
         return tmpl.render(url='/', wait='4', action='Removing Image')
 
@@ -141,11 +107,11 @@ class DockerLab(object):
     @cherrypy.expose
     @require()
     def reboot(self, pubport):
-        cli.restart(getcontainerbyport(pubport)['Id'])
+        self.docker.rebootcontainer(pubport)
         tmpl = lookup.get_template("connect.html")
         return tmpl.render(wait='4',
                            action='Rebooting Container',
-                           port=str(port-1),
+                           port=pubport,
                            password='password')
 
     # Remove and start a fresh container from the same image
@@ -153,17 +119,11 @@ class DockerLab(object):
     @cherrypy.expose
     @require()
     def reset(self, pubport):
-        cid = getcontainerbyport(pubport)
-        cli.remove_container(container=cid['Id'], force=True)
-        container = cli.create_container(image=cid['Image'],
-                                         ports=[6081],
-                                         host_config=cli.create_host_config(
-                                             port_bindings={6081: pubport}))
-        cli.start(container=container.get('Id'))
+        self.docker.resetcontainer(pubport)
         tmpl = lookup.get_template("connect.html")
         return tmpl.render(wait='10',
                            action='Resetting Container',
-                           port=str(port-1),
+                           port=pubport,
                            password='password')
 
     # End the session but leave the container running
@@ -171,13 +131,7 @@ class DockerLab(object):
     @cherrypy.expose
     @require()
     def endsession(self, pubport):
-        cid = getcontainerbyport(pubport)
-        iid = cli.inspect_image(cid['Image'])
-        try:
-            info = json.loads(cli.inspect_image(cid['Image'])['Comment'])
-        except Exception as e:
-            info = json.loads('{"Name": "Unnamed Image",' +
-                              '"Desc": "Undescribed Image"}')
+        info = self.docker.getimagemetadata(pubport)
         tmpl = lookup.get_template("endsession.html")
         return tmpl.render(port=pubport, name=info['Name'], desc=info['Desc'])
 
@@ -186,13 +140,7 @@ class DockerLab(object):
     @cherrypy.expose
     @require()
     def saveinst(self, pubport):
-        cid = getcontainerbyport(pubport)
-        iid = cli.inspect_image(cid['Image'])
-        try:
-            info = json.loads(cli.inspect_image(cid['Image'])['Comment'])
-        except Exception as e:
-            info = json.loads('{"Name": "Unnamed Image",' +
-                              '"Desc": "Undescribed Image"}')
+        info = self.docker.getimagemetadata(pubport)
         tmpl = lookup.get_template("save.html")
         return tmpl.render(port=pubport, name=info['Name'], desc=info['Desc'])
 
@@ -203,22 +151,7 @@ class DockerLab(object):
     def save(self, pubport, name, desc):
         sess = cherrypy.session
         username = cherrypy.session.get(SESSION_KEY)
-        cid = getcontainerbyport(pubport)
-        if (cid['Image'].split(':')[0] == 'userimages_'+username):
-            cli.commit(container=cid['Id'],
-                       repository='userimages_'+username,
-                       tag=str(cid['Image']).split(':')[1],
-                       message='{"Name": "' +
-                       name +
-                       '", "Desc": "' + desc + '"}')
-        else:
-            cli.commit(container=cid['Id'],
-                       repository='userimages_'+username,
-                       tag=str(cid['Names'][0]).replace('/', '') +
-                       '-'+str(cid['Image']).split(':')[1],
-                       message='{"Name": "' +
-                       name+'", "Desc": "' + desc + '"}')
-        cli.remove_container(container=cid['Id'], force=True)
+        self.docker.saveimage(username, pubport, name, desc)
         tmpl = lookup.get_template("redirect.html")
         return tmpl.render(url='/', wait='4', action='Saving Container')
 
@@ -228,11 +161,10 @@ class DockerLab(object):
     @cherrypy.expose
     @require(member_of('admin'))
     def promote(self, sourcename):
-        try:
-            info = json.loads(cli.inspect_image(sourcename))
-        except Exception as e:
-            info = json.loads('{"Name": "Unnamed Image",' +
-                              '"Desc": "Undescribed Image"}')
+        info = self.docker.getimagemetadata(0, sourcename)
+        print "====="
+        print info
+        print "====="
         tmpl = lookup.get_template("promote.html")
         return tmpl.render(repo=sourcename,
                            reponame=sourcename.split(
@@ -246,7 +178,7 @@ class DockerLab(object):
     @cherrypy.expose
     @require(member_of('admin'))
     def commit(self, repo, reponame, name, desc):
-        cli.tag(image=repo, repository="dockerlab", tag=reponame, force=True)
+        self.docker.commitimage(repo, reponame, name, desc)
         tmpl = lookup.get_template("redirect.html")
         return tmpl.render(url='/', wait='4', action='Committing Image.')
 
@@ -255,8 +187,7 @@ class DockerLab(object):
     @cherrypy.expose
     @require()
     def destroy(self, pubport):
-        cid = getcontainerbyport(pubport)
-        cli.remove_container(container=cid['Id'], force=True)
+        self.docker.destroycontainer(pubport)
         tmpl = lookup.get_template("redirect.html")
         return tmpl.render(url='/', wait='4', action='Destroying Container')
 
@@ -266,57 +197,9 @@ class DockerLab(object):
     @require()
     @mimetype('application/x-tar')
     def downloadhome(self, pubport):
-        cid = getcontainerbyport(pubport)
-        name = cid['Names'][0].replace('/', '')
-        filename = 'attachment; filename="' + name + '_homedir.tar"'
-        hometar = cli.copy(container=cid['Id'], resource='/home')
-        cherrypy.response.headers['Content-Disposition'] = filename
-        return hometar
-
-    # Used to get images using repository name
-    # Base image metadata is stored in the comment
-    # field of the image in JSON.  If the metadata is absent
-    # defaults are assumed for display.
-
-    def getimagesbyrepo(self, repository):
-        storedImages = []
-        images = cli.images(repository)
-        for img in images:
-            try:
-                info = json.loads(cli.inspect_image(img['Id'])['Comment'])
-            except Exception as e:
-                info = json.loads('{"Name": "Unnamed Image",' +
-                                  '"Desc": "Undescribed Image"}')
-            imagedef = {}
-            imagedef['RepoTag'] = img['RepoTags'][0]
-            imagedef['Name'] = info['Name']
-            imagedef['Desc'] = info['Desc']
-            storedImages.append(imagedef)
-        return storedImages
-
-
-# Used to confirm the availability of a local port
-
-def testport(portnum):
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    try:
-        s.bind(('0.0.0.0', port))
-    except socket.error as e:
-        s.close()
-        return True
-    s.close()
-    return False
-
-
-# Used to reference a public port number to a running container
-
-def getcontainerbyport(pubport):
-    containers = cli.containers()
-    for img in containers:
-        for prt in img['Ports']:
-            if prt['PrivatePort'] == 6081:
-                if (int(prt['PublicPort']) == int(pubport)):
-                    return img
+        hometar = self.docker.getcontainerhome(pubport)
+        cherrypy.response.headers['Content-Disposition'] = hometar['filename']
+        return hometar['data']
 
 
 cherrypy.quickstart(DockerLab())

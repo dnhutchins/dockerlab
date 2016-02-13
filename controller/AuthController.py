@@ -7,6 +7,7 @@ from model.User import User
 
 lookup = TemplateLookup(directories=['view'])
 SESSION_KEY = '_cp_username'
+users = User()
 
 
 def check_auth(*args, **kwargs):
@@ -51,7 +52,13 @@ def require(*conditions):
 def member_of(groupname):
     def check():
         # replace with actual check if <username> is in <groupname>
-        return cherrypy.request.login == 'joe' and groupname == 'admin'
+        user = users.getuser(cherrypy.request.login)
+        if user:
+            if user['group'] == groupname:
+                return True
+            else:
+                return False
+        return False
     return check
 
 
@@ -88,12 +95,12 @@ def all_of(*conditions):
 
 class AuthController(object):
 
-    users = User()
+    global users
 
     def check_credentials(self, username, password):
         """Verifies credentials for username and password.
         Returns None on success or a string describing the error on failure"""
-        return self.users.checkuserpass(username, password)
+        return users.checkuserpass(username, password)
 
         # An example implementation which uses an ORM could be:
         # u = User.get(username)
