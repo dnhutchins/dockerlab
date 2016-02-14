@@ -1,6 +1,7 @@
 import json
 import hashlib
 import base64
+import zlib
 from docker import Client
 
 cli = Client(base_url='unix://var/run/docker.sock')
@@ -32,7 +33,7 @@ class User(object):
                        '2zanklIXmpSPXQmx7FnqZbnOpynGMI3j/Onu2/7xR3rm' \
                        'T6oDAAAAAAAAAADwv+7c8q/OACgAAA=='
         nullimage = base64.b64decode(nullimageenc)
-        cli.import_image_from_data(nullimage, 'dockerlabconfig', 'auth')
+        cli.import_image_from_data(zlib.decompress(nullimage, 16+zlib.MAX_WBITS), 'dockerlabconfig', 'auth')
 
     def initdatabase(self):
         self.adduser('admin','notsecret','admin','Default ADMIN account.')
