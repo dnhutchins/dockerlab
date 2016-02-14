@@ -112,7 +112,7 @@ class AuthController(object):
     def adduser(self, username, password, comment, admin):
         group = "user"
         if admin:
-           group = "admin"
+            group = "admin"
         return users.adduser(username, password, group, comment)
 
     def on_login(self, username):

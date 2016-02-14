@@ -10,7 +10,6 @@ cli = Client(base_url='unix://var/run/docker.sock')
 class User(object):
 
     userDB = {}
-    
 
     def __init__(self):
         self.userDB = self.getdatabase()
@@ -33,21 +32,25 @@ class User(object):
                        '2zanklIXmpSPXQmx7FnqZbnOpynGMI3j/Onu2/7xR3rm' \
                        'T6oDAAAAAAAAAADwv+7c8q/OACgAAA=='
         nullimage = base64.b64decode(nullimageenc)
-        cli.import_image_from_data(zlib.decompress(nullimage, 16+zlib.MAX_WBITS), 'dockerlabconfig', 'auth')
+        cli.import_image_from_data(zlib.decompress(nullimage,
+                                                   16 + zlib.MAX_WBITS),
+                                   'dockerlabconfig',
+                                   'auth')
 
     def initdatabase(self):
-        self.adduser('admin','notsecret','admin','Default ADMIN account.')
-        self.adduser('user','notsecret','user','Default USER account.')
+        self.adduser('admin', 'notsecret', 'admin', 'Default ADMIN account.')
+        self.adduser('user', 'notsecret', 'user', 'Default USER account.')
         self.writedatabase()
 
     def writedatabase(self):
-        newcontainer = cli.create_container('dockerlabconfig:auth', '/dev/null')
+        newcontainer = cli.create_container('dockerlabconfig:auth',
+                                            '/dev/null')
         cli.commit(newcontainer['Id'],
                    'dockerlabconfig',
                    'auth',
                    json.dumps(self.userDB))
-        cli.remove_container(newcontainer['Id']) 
-        
+        cli.remove_container(newcontainer['Id'])
+
     def checkuserpass(self, username, password):
         user = self.getuser(username)
         if user:
@@ -95,6 +98,6 @@ class User(object):
         if getuser(username):
             del userDB[username]
             self.writedatabase()
-            return True 
+            return True
         else:
             return False

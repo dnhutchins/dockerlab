@@ -7,7 +7,6 @@ cli = Client(base_url='unix://var/run/docker.sock')
 port = 6000
 
 
-
 class DockerController(object):
 
     def getrunningcontainers(self, username):
@@ -86,7 +85,7 @@ class DockerController(object):
 
     # get the metadata form for an image
 
-    def getimagemetadata(self, pubport, sourcename = ''):
+    def getimagemetadata(self, pubport, sourcename=''):
         if sourcename != '':
             comment = cli.inspect_image(sourcename)['Comment']
         else:
@@ -98,7 +97,6 @@ class DockerController(object):
             info = json.loads('{"Name": "Unnamed Image",' +
                               '"Desc": "Undescribed Image"}')
         return info
-
 
     # Save the container as a new user image
 
@@ -189,5 +187,3 @@ def getcontainerbyport(pubport):
             if prt['PrivatePort'] == 6081:
                 if (int(prt['PublicPort']) == int(pubport)):
                     return img
-
-
