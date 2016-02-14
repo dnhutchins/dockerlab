@@ -12,17 +12,25 @@ import cherrypy
 import socket
 import sys
 import json
+import os
 from docker import Client
 from mako.template import Template
 from mako.lookup import TemplateLookup
-from controller.AuthController import AuthController, require, member_of, name_is
+from controller.AuthController import (AuthController,
+                                       require,
+                                       member_of,
+                                       name_is)
 from controller.DockerController import DockerController
 
 SESSION_KEY = '_cp_username'
+SESSION_DIR = '/opt/dockerlab/sessions'
 lookup = TemplateLookup(directories=['view'])
 cli = Client(base_url='unix://var/run/docker.sock')
 port = 6000
 
+
+if not os.path.exists(SESSION_DIR):
+    os.makedirs(SESSION_DIR)
 
 # Decorator to designate mime type
 
@@ -36,7 +44,7 @@ def mimetype(type):
 
 
 def handle_error():
-    tmpl = lookup.get_template("error.html")
+    tmpl = lookup.get_template('error.html')
     cherrypy.response.status = 500
     cherrypy.response.body = [
         tmpl.render()
@@ -47,6 +55,8 @@ class DockerLab(object):
 
     _cp_config = {
         'tools.sessions.on': True,
+        'tools.sessions.storage_type': 'file',
+        'tools.sessions.storage_path': SESSION_DIR,
         'tools.auth.on': True,
         'tools.proxy.on': True,
         'tools.proxy.local': 'X-Forwarded-Host',
@@ -69,7 +79,7 @@ class DockerLab(object):
         userimages = self.docker.getuserimages(username)
         savedcount += len(userimages)
         admin = self.auth.isadmin(username)
-        tmpl = lookup.get_template("index.html")
+        tmpl = lookup.get_template('index.html')
         return tmpl.render(baseimages=baseimages,
                            userimages=userimages,
                            runningimages=runningimages,
@@ -89,7 +99,7 @@ class DockerLab(object):
     @require()
     def launch(self, container):
         port = self.docker.launchcontainer(container)
-        tmpl = lookup.get_template("connect.html")
+        tmpl = lookup.get_template('connect.html')
         return tmpl.render(wait='4',
                            action='Loading Session.......',
                            port=str(port),
@@ -101,7 +111,7 @@ class DockerLab(object):
     @require()
     def delete(self, container):
         self.docker.deletecontainer(container)
-        tmpl = lookup.get_template("redirect.html")
+        tmpl = lookup.get_template('redirect.html')
         return tmpl.render(url='/', wait='4', action='Removing Image')
 
     # Reboot a container
@@ -110,7 +120,7 @@ class DockerLab(object):
     @require()
     def reboot(self, pubport):
         self.docker.rebootcontainer(pubport)
-        tmpl = lookup.get_template("connect.html")
+        tmpl = lookup.get_template('connect.html')
         return tmpl.render(wait='4',
                            action='Rebooting Container',
                            port=pubport,
@@ -122,7 +132,7 @@ class DockerLab(object):
     @require()
     def reset(self, pubport):
         self.docker.resetcontainer(pubport)
-        tmpl = lookup.get_template("connect.html")
+        tmpl = lookup.get_template('connect.html')
         return tmpl.render(wait='10',
                            action='Resetting Container',
                            port=pubport,
@@ -134,7 +144,7 @@ class DockerLab(object):
     @require()
     def endsession(self, pubport):
         info = self.docker.getimagemetadata(pubport)
-        tmpl = lookup.get_template("endsession.html")
+        tmpl = lookup.get_template('endsession.html')
         return tmpl.render(port=pubport, name=info['Name'], desc=info['Desc'])
 
     # Display the metadata form for saving to a user image
@@ -143,7 +153,7 @@ class DockerLab(object):
     @require()
     def saveinst(self, pubport):
         info = self.docker.getimagemetadata(pubport)
-        tmpl = lookup.get_template("save.html")
+        tmpl = lookup.get_template('save.html')
         return tmpl.render(port=pubport, name=info['Name'], desc=info['Desc'])
 
     # Save the container as a new user image
@@ -154,7 +164,7 @@ class DockerLab(object):
         sess = cherrypy.session
         username = cherrypy.session.get(SESSION_KEY)
         self.docker.saveimage(username, pubport, name, desc)
-        tmpl = lookup.get_template("redirect.html")
+        tmpl = lookup.get_template('redirect.html')
         return tmpl.render(url='/', wait='4', action='Saving Container')
 
     # Display the metadata form for promoting to base image
@@ -164,13 +174,10 @@ class DockerLab(object):
     @require(member_of('admin'))
     def promote(self, sourcename):
         info = self.docker.getimagemetadata(0, sourcename)
-        print "====="
-        print info
-        print "====="
-        tmpl = lookup.get_template("promote.html")
+        tmpl = lookup.get_template('promote.html')
         return tmpl.render(repo=sourcename,
                            reponame=sourcename.split(
-                               ':')[1].split("-")[1],
+                               ':')[1].split('-')[1],
                            name=info['Name'],
                            desc=info['Desc'])
 
@@ -181,7 +188,7 @@ class DockerLab(object):
     @require(member_of('admin'))
     def commit(self, repo, reponame, name, desc):
         self.docker.commitimage(repo, reponame, name, desc)
-        tmpl = lookup.get_template("redirect.html")
+        tmpl = lookup.get_template('redirect.html')
         return tmpl.render(url='/', wait='4', action='Committing Image.')
 
     # Removes a running container
@@ -190,7 +197,7 @@ class DockerLab(object):
     @require()
     def destroy(self, pubport):
         self.docker.destroycontainer(pubport)
-        tmpl = lookup.get_template("redirect.html")
+        tmpl = lookup.get_template('redirect.html')
         return tmpl.render(url='/', wait='4', action='Destroying Container')
 
     # Downloads a copy of the running containers /home directory
@@ -206,19 +213,18 @@ class DockerLab(object):
     @cherrypy.expose
     @require(member_of('admin'))
     def adduser(self):
-        tmpl = lookup.get_template("adduser.html")
+        tmpl = lookup.get_template('adduser.html')
         return tmpl.render()
 
     @cherrypy.expose
     @require(member_of('admin'))
-    def commituser(self, username, password, comment, admin = ''):
+    def commituser(self, username, password, comment, admin=''):
         adminflag = False
-        if admin == "true":
+        if admin == 'true':
             adminflag = True
         self.auth.adduser(username, password, comment, adminflag)
-        tmpl = lookup.get_template("redirect.html")
+        tmpl = lookup.get_template('redirect.html')
         return tmpl.render(url='/', wait='4', action='Creating User')
-
 
 
 cherrypy.quickstart(DockerLab())
