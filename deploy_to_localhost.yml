@@ -1,6 +1,6 @@
 ---
 - name: Launch services
-  hosts: localhost
+  hosts: "{{ lookup('env','deployment_host') }}"
   connection: local
   become: True
   become_method: sudo
