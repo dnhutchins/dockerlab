@@ -105,6 +105,18 @@ class DockerLab(object):
                            port=str(port),
                            password='password')
 
+    # Connect to a container
+
+    @cherrypy.expose
+    @require()
+    def connect(self, port):
+        path = '/' + str(port) + "/websockify"
+        password = str(os.urandom(32).encode('hex'))[0:32]
+        self.docker.setvncpassword(port, password)
+        tmpl = lookup.get_template('vnc.html')
+        return tmpl.render(password=password,
+                           path=path)
+
     # Delete a container
 
     @cherrypy.expose

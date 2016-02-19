@@ -62,6 +62,14 @@ class DockerController(object):
         port += 1
         return port-1
 
+    # Set VNC password
+
+    def setvncpassword(self, pubport, password):
+        cid = getcontainerbyport(pubport)
+        cmdexc = cli.exec_create(container=cid['Id'], cmd='bash -c \'echo -e "' + password + '\n' + password + '\n\n"|vncpasswd\'', tty=True, user="user")
+        cli.exec_start(cmdexc)
+        return True
+
     # Delete a container
 
     def deletecontainer(self, container):
