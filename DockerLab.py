@@ -32,6 +32,7 @@ port = 6000
 if not os.path.exists(SESSION_DIR):
     os.makedirs(SESSION_DIR)
 
+
 # Decorator to designate mime type
 
 def mimetype(type):

@@ -66,7 +66,11 @@ class DockerController(object):
 
     def setvncpassword(self, pubport, password):
         cid = getcontainerbyport(pubport)
-        cmdexc = cli.exec_create(container=cid['Id'], cmd='bash -c \'echo -e "' + password + '\n' + password + '\n\n"|vncpasswd\'', tty=True, user="user")
+        cmdexc = cli.exec_create(container=cid['Id'],
+                                 cmd='bash -c \'echo -e "' +
+                                 password +
+                                 '\n' + password + '\n\n"|vncpasswd\'',
+                                 tty=True, user="user")
         cli.exec_start(cmdexc)
         return True
 
