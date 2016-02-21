@@ -239,5 +239,19 @@ class DockerLab(object):
         tmpl = lookup.get_template('redirect.html')
         return tmpl.render(url='/', wait='4', action='Creating User')
 
+    @cherrypy.expose
+    @require()
+    def changepassword(self):
+        tmpl = lookup.get_template('changepassword.html')
+        return tmpl.render()
+
+    @cherrypy.expose
+    @require()
+    def commitchangepassword(self, oldpassword, newpassword):
+        username = cherrypy.session.get(SESSION_KEY)
+        self.auth.changepassword(username, oldpassword, newpassword)
+        tmpl = lookup.get_template('redirect.html')
+        return tmpl.render(url='/', wait='4', action='Changing Password')
+
 
 cherrypy.quickstart(DockerLab())

@@ -77,6 +77,19 @@ class User(object):
             self.setpassword(username, password)
             return True
 
+    def changepassword(self, username, oldpassword, newpassword):
+        user = self.getuser(username)
+        if user:
+            passhasher = hashlib.sha256()
+            passhasher.update(oldpassword)
+            passhash = passhasher.hexdigest()
+            if passhash == user['password']:
+                self.setpassword(username, newpassword)
+            else: 
+                return u"Incorrect old password"
+        else:
+            return u"Incorrect old password";
+
     def setpassword(self, username, password):
         if self.getuser(username):
             passhasher = hashlib.sha256()

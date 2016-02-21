@@ -163,6 +163,10 @@ class AuthController(object):
             raise cherrypy.HTTPRedirect(from_page or "/")
 
     @cherrypy.expose
+    def changepassword(self, username, oldpassword, newpassword):
+        return users.changepassword(username, oldpassword, newpassword)
+
+    @cherrypy.expose
     def logout(self, from_page="/"):
         sess = cherrypy.session
         username = sess.get(SESSION_KEY, None)
