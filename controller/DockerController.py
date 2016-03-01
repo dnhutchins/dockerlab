@@ -108,6 +108,8 @@ class DockerController(object):
         except Exception as e:
             info = json.loads('{"Name": "Unnamed Image",' +
                               '"Desc": "Undescribed Image"}')
+        print("Called with: " + str(pubport) + " and " + str(sourcename))
+        print("Returning: " + str(info))
         return info
 
     # Save the container as a new user image
@@ -115,19 +117,30 @@ class DockerController(object):
     def saveimage(self, username, pubport, name, desc):
         cid = getcontainerbyport(pubport)
         if (cid['Image'].split(':')[0] == 'userimages_'+username):
+            repository = 'userimages_' + username
+            tag = str(cid['Image']).split(':')[1]
+            message = {}
+            message['Name'] = name
+            message['Desc'] = desc
+
             cli.commit(container=cid['Id'],
-                       repository='userimages_'+username,
-                       tag=str(cid['Image']).split(':')[1],
-                       message='{"Name": "' +
-                       name +
-                       '", "Desc": "' + desc + '"}')
+                       repository=repository,
+                       tag=tag,
+                       message=json.dumps(message))
         else:
+            repository = 'userimages_'+username
+            containername = str(cid['Names'][0]).replace('/', '')
+            reponame = str(cid['Image']).split(':')[1]
+            tag = containername + '-' + reponame
+            message = {}
+            message['Name'] = name
+            message['Desc'] = desc
+
             cli.commit(container=cid['Id'],
-                       repository='userimages_'+username,
-                       tag=str(cid['Names'][0]).replace('/', '') +
-                       '-'+str(cid['Image']).split(':')[1],
-                       message='{"Name": "' +
-                       name+'", "Desc": "' + desc + '"}')
+                       repository=repository,
+                       tag=tag,
+                       message=json.dumps(message))
+
         cli.remove_container(container=cid['Id'], force=True)
         return True
 

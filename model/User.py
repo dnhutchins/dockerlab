@@ -85,10 +85,10 @@ class User(object):
             passhash = passhasher.hexdigest()
             if passhash == user['password']:
                 self.setpassword(username, newpassword)
-            else: 
+            else:
                 return u"Incorrect old password"
         else:
-            return u"Incorrect old password";
+            return u"Incorrect old password"
 
     def setpassword(self, username, password):
         if self.getuser(username):
