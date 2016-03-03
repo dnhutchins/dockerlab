@@ -51,7 +51,6 @@ class Container(object):
             return containers[cid]
         else:
             return False
-        
 
     def getcontainers(self, username):
         if username in self.containerDB.keys():
@@ -67,7 +66,7 @@ class Container(object):
         if not containers:
             self.containerDB[username] = {}
             containers = self.containerDB[username]
-        containers[cid]= container
+        containers[cid] = container
         self.writedatabase()
         return True
 
@@ -92,6 +91,5 @@ class Container(object):
         containers = self.getcontainers(username)
         if containers:
             if cid in containers.keys():
-               return containers[cid]['port']
-        return FalseA
-
+                return containers[cid]['port']
+        return False
