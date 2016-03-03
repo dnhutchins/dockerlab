@@ -8,6 +8,7 @@
 # datastore other than Docker itself. Image metadata is stored
 # directly in the comment field of the image as a JSON object
 
+import threading
 import cherrypy
 import socket
 import sys
@@ -21,6 +22,8 @@ from controller.AuthController import (AuthController,
                                        member_of,
                                        name_is)
 from controller.DockerController import DockerController
+from controller.WebsockifyToken import WebsockifyToken
+from lib.websockify.websocketproxy import WebSocketProxy
 
 SESSION_KEY = '_cp_username'
 SESSION_DIR = '/opt/dockerlab/sessions'
@@ -28,6 +31,10 @@ lookup = TemplateLookup(directories=['view'])
 cli = Client(base_url='unix://var/run/docker.sock')
 port = 6000
 
+websocket_proxy_server = WebSocketProxy(listen_host='', listen_port='6000', token_plugin=WebsockifyToken())
+websocket_thread = threading.Thread(target=websocket_proxy_server.start_server, args=())
+websocket_thread.daemon = True
+websocket_thread.start()
 
 if not os.path.exists(SESSION_DIR):
     os.makedirs(SESSION_DIR)
@@ -99,31 +106,35 @@ class DockerLab(object):
     @cherrypy.expose
     @require()
     def launch(self, container):
-        port = self.docker.launchcontainer(container)
+        cid = self.docker.launchcontainer(cherrypy.session.get(SESSION_KEY), container)
         tmpl = lookup.get_template('connect.html')
         return tmpl.render(wait='4',
                            action='Loading Session.......',
-                           port=str(port),
+                           cid=str(cid),
                            password='password')
 
     # Connect to a container
 
     @cherrypy.expose
     @require()
-    def connect(self, port):
-        path = '/' + str(port) + "/websockify"
+    def connect(self, cid):
+        username = cherrypy.session.get(SESSION_KEY)
         password = str(os.urandom(32).encode('hex'))[0:32]
-        self.docker.setvncpassword(port, password)
+        self.docker.setvncpassword(username, cid, password)
+        path = '/getstream/getstream/websockify'
+        token = username + ':' + cid
         tmpl = lookup.get_template('vnc.html')
         return tmpl.render(password=password,
-                           path=path)
+                           path=path,
+                           token=token)
 
     # Delete a container
 
     @cherrypy.expose
     @require()
-    def delete(self, container):
-        self.docker.deletecontainer(container)
+    def delete(self, cid):
+        username = cherrypy.session.get(SESSION_KEY)
+        self.docker.deletecontainer(username, cid)
         tmpl = lookup.get_template('redirect.html')
         return tmpl.render(url='/', wait='4', action='Removing Image')
 
@@ -131,52 +142,43 @@ class DockerLab(object):
 
     @cherrypy.expose
     @require()
-    def reboot(self, pubport):
-        self.docker.rebootcontainer(pubport)
+    def reboot(self, cid):
+        username = cherrypy.session.get(SESSION_KEY)
+        self.docker.rebootcontainer(cid)
+        password = str(os.urandom(32).encode('hex'))[0:32]
+        self.docker.setvncpassword(username, cid, password)
         tmpl = lookup.get_template('connect.html')
         return tmpl.render(wait='4',
                            action='Rebooting Container',
-                           port=pubport,
-                           password='password')
-
-    # Remove and start a fresh container from the same image
-
-    @cherrypy.expose
-    @require()
-    def reset(self, pubport):
-        self.docker.resetcontainer(pubport)
-        tmpl = lookup.get_template('connect.html')
-        return tmpl.render(wait='10',
-                           action='Resetting Container',
-                           port=pubport,
-                           password='password')
+                           cid=cid,
+                           password=password)
 
     # End the session but leave the container running
 
     @cherrypy.expose
     @require()
-    def endsession(self, pubport):
-        info = self.docker.getimagemetadata(pubport)
+    def endsession(self, cid):
+        info = self.docker.getimagemetadata(cid)
         tmpl = lookup.get_template('endsession.html')
-        return tmpl.render(port=pubport, name=info['Name'], desc=info['Desc'])
+        return tmpl.render(cid=cid, name=info['Name'], desc=info['Desc'])
 
     # Display the metadata form for saving to a user image
 
     @cherrypy.expose
     @require()
-    def saveinst(self, pubport):
-        info = self.docker.getimagemetadata(pubport)
+    def saveinst(self, cid):
+        info = self.docker.getimagemetadata(cid)
         tmpl = lookup.get_template('save.html')
-        return tmpl.render(port=pubport, name=info['Name'], desc=info['Desc'])
+        return tmpl.render(cid=cid, name=info['Name'], desc=info['Desc'])
 
     # Save the container as a new user image
 
     @cherrypy.expose
     @require()
-    def save(self, pubport, name, desc):
+    def save(self, cid, name, desc):
         sess = cherrypy.session
         username = cherrypy.session.get(SESSION_KEY)
-        self.docker.saveimage(username, pubport, name, desc)
+        self.docker.saveimage(username, cid, name, desc)
         tmpl = lookup.get_template('redirect.html')
         return tmpl.render(url='/', wait='4', action='Saving Container')
 
@@ -208,8 +210,9 @@ class DockerLab(object):
 
     @cherrypy.expose
     @require()
-    def destroy(self, pubport):
-        self.docker.destroycontainer(pubport)
+    def destroy(self, cid):
+        username = cherrypy.session.get(SESSION_KEY)
+        self.docker.destroycontainer(username, cid)
         tmpl = lookup.get_template('redirect.html')
         return tmpl.render(url='/', wait='4', action='Destroying Container')
 
@@ -218,8 +221,8 @@ class DockerLab(object):
     @cherrypy.expose
     @require()
     @mimetype('application/x-tar')
-    def downloadhome(self, pubport):
-        hometar = self.docker.getcontainerhome(pubport)
+    def downloadhome(self, cid):
+        hometar = self.docker.getcontainerhome(cid)
         cherrypy.response.headers['Content-Disposition'] = hometar['filename']
         return hometar['data']
 

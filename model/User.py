@@ -21,7 +21,6 @@ class User(object):
         else:
             self.createdatabase()
             self.initdatabase()
-            self.writedatabase()
             container = cli.images('dockerlabconfig:auth')
             info = json.loads(cli.inspect_image(container[0]['Id'])['Comment'])
         return info
@@ -40,7 +39,6 @@ class User(object):
     def initdatabase(self):
         self.adduser('admin', 'notsecret', 'admin', 'Default ADMIN account.')
         self.adduser('user', 'notsecret', 'user', 'Default USER account.')
-        self.writedatabase()
 
     def writedatabase(self):
         newcontainer = cli.create_container('dockerlabconfig:auth',
@@ -73,7 +71,6 @@ class User(object):
             userrecord['comment'] = comment
             self.userDB[username] = {}
             self.userDB[username] = userrecord
-            self.writedatabase()
             self.setpassword(username, password)
             return True
 

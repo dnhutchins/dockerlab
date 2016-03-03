@@ -208,7 +208,7 @@
 
             // If a token variable is passed in, set the parameter in a cookie.
             // This is used by nova-novncproxy.
-            token = WebUtil.getConfigVar('token', null);
+            token = WebUtil.getConfigVar('token', '${token}');
             if (token) {
 
                 // if token is already present in the path we should use it

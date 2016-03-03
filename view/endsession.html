@@ -7,8 +7,8 @@
 				<h1>End Session</h1>
                                 <div class="container">
                                    <div class="column-center"><img style="border: 0px; background: none;" src="/static/images/or.png"></div>
-                                   <div class="column-left"><h3>Destroy Image</h3><br><br><br><a href="/destroy/${port}" style="font-size: 27px; border: 1px solid #000; padding: 4px;">DELETE</a></div>
-                                   <div class="column-right"><h3>Save Image</h3><b>Name & Description</b><br><form style="margin: 0; border: 0; padding: 0;" action="/save" method="POST"><input type="hidden" value="${port}" name="pubport"><input style="width: 256px;" type="text" name="name" id="name" value="${name}"><br><textarea style="width: 256px; margin-left: 39px;" name="desc" id="desc">${desc}</textarea><br><input type="submit" style="font-size: 27px; border: 1px solid #000; padding: 4px;" value="SAVE"></form></div>
+                                   <div class="column-left"><h3>Destroy Image</h3><br><br><br><a href="/destroy/${cid}" style="font-size: 27px; border: 1px solid #000; padding: 4px;">DELETE</a></div>
+                                   <div class="column-right"><h3>Save Image</h3><b>Name & Description</b><br><form style="margin: 0; border: 0; padding: 0;" action="/save" method="POST"><input type="hidden" value="${cid}" name="cid"><input style="width: 256px;" type="text" name="name" id="name" value="${name}"><br><textarea style="width: 256px; margin-left: 39px;" name="desc" id="desc">${desc}</textarea><br><input type="submit" style="font-size: 27px; border: 1px solid #000; padding: 4px;" value="SAVE"></form></div>
                                 </div>
 	  		</div> 	
 			  

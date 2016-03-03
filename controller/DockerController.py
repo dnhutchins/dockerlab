@@ -2,10 +2,11 @@ import socket
 import sys
 import json
 from docker import Client
+from model.Container import Container
 
 cli = Client(base_url='unix://var/run/docker.sock')
 port = 6000
-
+containers = Container()
 
 class DockerController(object):
 
@@ -17,17 +18,14 @@ class DockerController(object):
         # number is also used in the path for the websocket as defined
         # in the nginx configuration.
 
-        containers = cli.containers()
         runningimages = []
-        for img in containers:
+        for img in containers.getcontainers(username).keys():
             active_container = {}
-            rinfo = cli.inspect_container(img['Id'])
-            active_container['Image'] = img['Image']
-            active_container['Name'] = img['Names'][0].replace('/', '')
+            rinfo = cli.inspect_container(img)
+            active_container['Image'] = rinfo['Config']['Image']
+            active_container['Name'] = rinfo['Name'].replace('/', '')
             active_container['Start'] = rinfo['State']['StartedAt']
-            for prt in img['Ports']:
-                if prt['PrivatePort'] == 6081:
-                    active_container['Port'] = prt['PublicPort']
+            active_container['Cid'] = img
             runningimages.append(active_container)
         return runningimages
 
@@ -50,98 +48,89 @@ class DockerController(object):
     # the next available port is found. This maintains ligntness
     # by not managing a port mapping in an unnecessary data structure.
 
-    def launchcontainer(self, container):
+    def launchcontainer(self, username, container):
         global port
         while testport(port):
             port += 1
         container = cli.create_container(image=container,
-                                         ports=[6081],
+                                         ports=[5901],
                                          host_config=cli.create_host_config(
-                                             port_bindings={6081: port}))
+                                             port_bindings={5901: port}))
         response = cli.start(container=container.get('Id'))
+        containers.addcontainer(username, container.get('Id'), port, 'password')
         port += 1
-        return port-1
+        return container.get('Id')
 
     # Set VNC password
 
-    def setvncpassword(self, pubport, password):
-        cid = getcontainerbyport(pubport)
-        cmdexc = cli.exec_create(container=cid['Id'],
+    def setvncpassword(self, username, cid, password):
+        cmdexc = cli.exec_create(container=cid,
                                  cmd='bash -c \'echo -e "' +
                                  password +
                                  '\n' + password + '\n\n"|vncpasswd\'',
                                  tty=True, user="user")
         cli.exec_start(cmdexc)
+        containers.setvncpassword(username, cid, password)
         return True
 
     # Delete a container
 
-    def deletecontainer(self, container):
-        return cli.remove_image(container)
+    def deletecontainer(self, username, cid):
+        containers.removecontainer(username, cid)
+        cli.remove_image(cid)
+        return True
 
     # Reboot a container
 
-    def rebootcontainer(self, pubport):
-        return cli.restart(getcontainerbyport(pubport)['Id'])
-
-    # Remove and start a fresh container from the same image
-
-    def resetcontainer(self, pubport):
-        cid = getcontainerbyport(pubport)
-        cli.remove_container(container=cid['Id'], force=True)
-        container = cli.create_container(image=cid['Image'],
-                                         ports=[6081],
-                                         host_config=cli.create_host_config(
-                                             port_bindings={6081: pubport}))
-        cli.start(container=container.get('Id'))
+    def rebootcontainer(self, cid):
+        return cli.restart(cid)
 
     # get the metadata form for an image
 
-    def getimagemetadata(self, pubport, sourcename=''):
+    def getimagemetadata(self, cid, sourcename=''):
         if sourcename != '':
             comment = cli.inspect_image(sourcename)['Comment']
         else:
-            cid = getcontainerbyport(pubport)
-            comment = cli.inspect_image(cid['Image'])['Comment']
+            rinfo = cli.inspect_container(cid)
+            comment = cli.inspect_image(rinfo['Config']['Image'])['Comment']
         try:
             info = json.loads(comment)
         except Exception as e:
             info = json.loads('{"Name": "Unnamed Image",' +
                               '"Desc": "Undescribed Image"}')
-        print("Called with: " + str(pubport) + " and " + str(sourcename))
-        print("Returning: " + str(info))
         return info
 
     # Save the container as a new user image
 
-    def saveimage(self, username, pubport, name, desc):
-        cid = getcontainerbyport(pubport)
-        if (cid['Image'].split(':')[0] == 'userimages_'+username):
+    def saveimage(self, username, cid, name, desc):
+        rinfo = cli.inspect_container(cid) 
+        if (rinfo['Config']['Image'].split(':')[0] == 'userimages_'+username):
             repository = 'userimages_' + username
-            tag = str(cid['Image']).split(':')[1]
+            tag = str(rinfo['Config']['Image']).split(':')[1]
             message = {}
             message['Name'] = name
             message['Desc'] = desc
 
-            cli.commit(container=cid['Id'],
+            cli.commit(container=cid,
                        repository=repository,
                        tag=tag,
                        message=json.dumps(message))
         else:
             repository = 'userimages_'+username
-            containername = str(cid['Names'][0]).replace('/', '')
-            reponame = str(cid['Image']).split(':')[1]
+            containername = str(rinfo['Name']).replace('/', '')
+            reponame = str(rinfo['Config']['Image']).split(':')[1]
             tag = containername + '-' + reponame
             message = {}
             message['Name'] = name
             message['Desc'] = desc
 
-            cli.commit(container=cid['Id'],
+            cli.commit(container=cid,
                        repository=repository,
                        tag=tag,
                        message=json.dumps(message))
 
-        cli.remove_container(container=cid['Id'], force=True)
+        containers.removecontainer(username, cid)
+        cli.remove_container(container=cid, force=True)
         return True
 
     # tags an image as a base image
@@ -153,19 +142,19 @@ class DockerController(object):
 
     # Removes a running container
 
-    def destroycontainer(self, pubport):
-        cid = getcontainerbyport(pubport)
-        cli.remove_container(container=cid['Id'], force=True)
+    def destroycontainer(self, username, cid):
+        cli.remove_container(container=cid, force=True)
+        containers.removecontainer(username, cid)
         return True
 
     # gets a copy of the running containers /home directory
 
-    def getcontainerhome(self, pubport):
-        cid = getcontainerbyport(pubport)
-        name = cid['Names'][0].replace('/', '')
+    def getcontainerhome(self, cid):
+        rinfo = cli.inspect_container(cid)
+        name = rinfo['Name'].replace('/', '')
         hometar = {}
         hometar['filename'] = 'attachment; filename="' + name + '_homedir.tar"'
-        hometar['data'] = cli.copy(container=cid['Id'], resource='/home')
+        hometar['data'] = cli.copy(container=cid, resource='/home')
         return hometar
 
     # Used to get images using repository name
@@ -203,12 +192,3 @@ def testport(portnum):
     return False
 
 
-# Used to reference a public port number to a running container
-
-def getcontainerbyport(pubport):
-    containers = cli.containers()
-    for img in containers:
-        for prt in img['Ports']:
-            if prt['PrivatePort'] == 6081:
-                if (int(prt['PublicPort']) == int(pubport)):
-                    return img
