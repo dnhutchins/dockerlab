@@ -31,8 +31,11 @@ lookup = TemplateLookup(directories=['view'])
 cli = Client(base_url='unix://var/run/docker.sock')
 port = 6000
 
-websocket_proxy_server = WebSocketProxy(listen_host='', listen_port='6000', token_plugin=WebsockifyToken())
-websocket_thread = threading.Thread(target=websocket_proxy_server.start_server, args=())
+websocket_proxy_server = WebSocketProxy(listen_host='',
+                                        listen_port='6000',
+                                        token_plugin=WebsockifyToken())
+websocket_thread = threading.Thread(target=websocket_proxy_server.start_server,
+                                    args=())
 websocket_thread.daemon = True
 websocket_thread.start()
 
@@ -106,7 +109,8 @@ class DockerLab(object):
     @cherrypy.expose
     @require()
     def launch(self, container):
-        cid = self.docker.launchcontainer(cherrypy.session.get(SESSION_KEY), container)
+        cid = self.docker.launchcontainer(cherrypy.session.get(SESSION_KEY),
+                                          container)
         tmpl = lookup.get_template('connect.html')
         return tmpl.render(wait='4',
                            action='Loading Session.......',

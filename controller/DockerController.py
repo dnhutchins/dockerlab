@@ -8,6 +8,7 @@ cli = Client(base_url='unix://var/run/docker.sock')
 port = 6000
 containers = Container()
 
+
 class DockerController(object):
 
     def getrunningcontainers(self, username):
@@ -57,7 +58,10 @@ class DockerController(object):
                                          host_config=cli.create_host_config(
                                              port_bindings={5901: port}))
         response = cli.start(container=container.get('Id'))
-        containers.addcontainer(username, container.get('Id'), port, 'password')
+        containers.addcontainer(username,
+                                container.get('Id'),
+                                port,
+                                'password')
         port += 1
         return container.get('Id')
 
@@ -103,7 +107,7 @@ class DockerController(object):
     # Save the container as a new user image
 
     def saveimage(self, username, cid, name, desc):
-        rinfo = cli.inspect_container(cid) 
+        rinfo = cli.inspect_container(cid)
         if (rinfo['Config']['Image'].split(':')[0] == 'userimages_'+username):
             repository = 'userimages_' + username
             tag = str(rinfo['Config']['Image']).split(':')[1]
@@ -190,5 +194,3 @@ def testport(portnum):
         return True
     s.close()
     return False
-
-
