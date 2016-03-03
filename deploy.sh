@@ -25,7 +25,7 @@ elif [ $1 == "AWS" ]; then
     eval `ssh-agent -s`
     ssh-add private/init_key.pem
 
-    tar zcvf dl.tgz auth.py DockerLab.py genconf.sh static view model controller
+    tar zcvf dl.tgz DockerLab.py genconf.sh static view model controller lib
 
     ansible-playbook ./deploy_to_aws.yml
 
@@ -33,7 +33,7 @@ elif [ $1 == "AWS" ]; then
 else
     export deployment_host=$1
 
-    tar zcvf dl.tgz auth.py DockerLab.py genconf.sh static view model controller
+    tar zcvf dl.tgz DockerLab.py genconf.sh static view model controller lib
 
     ansible-playbook ./deploy_to_localhost.yml
 fi
